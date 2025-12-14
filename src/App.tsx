@@ -32,21 +32,17 @@ function App() {
     usePeerConnection({
       onTrack: handleRemoteTrack,
       onDataChannel: handleDataChannel,
+      createDataChannel,
     });
 
   const handleJoinSession = useCallback(async (offer: RTCSessionDescriptionInit) => {
     try {
-      const connection = getConnection();
-      if (connection) {
-        createDataChannel(connection);
-      }
-
       const code = await joinSession(offer);
       setMyAnswerCode(code);
     } catch (error) {
       console.error('Failed to join session:', error);
     }
-  }, [getConnection, createDataChannel, joinSession]);
+  }, [joinSession]);
 
   useEffect(() => {
     const offerFromUrl = SignalingService.getSessionFromUrl();
@@ -61,10 +57,6 @@ function App() {
   const handleCreateSession = async () => {
     try {
       await createSession();
-      const connection = getConnection();
-      if (connection) {
-        createDataChannel(connection);
-      }
     } catch (error) {
       console.error('Failed to create session:', error);
     }

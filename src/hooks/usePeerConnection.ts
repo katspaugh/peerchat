@@ -6,6 +6,7 @@ import type { ConnectionState } from '@/types';
 interface UsePeerConnectionCallbacks {
   onTrack?: (event: RTCTrackEvent) => void;
   onDataChannel?: (event: RTCDataChannelEvent) => void;
+  createDataChannel?: (connection: RTCPeerConnection) => void;
 }
 
 export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
@@ -47,25 +48,39 @@ export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
     setState('creating-offer');
 
     const service = initializeConnection();
+    const connection = service.getConnection();
+
+    // Create data channel before creating offer
+    if (callbacks.createDataChannel) {
+      callbacks.createDataChannel(connection);
+    }
+
     const offer = await service.createOffer();
     const link = SignalingService.createShareableLink(offer);
 
     setShareableLink(link);
     setState('waiting-for-code');
-  }, [initializeConnection]);
+  }, [initializeConnection, callbacks]);
 
   const joinSession = useCallback(
     async (offerFromUrl: RTCSessionDescriptionInit) => {
       setState('creating-offer');
 
       const service = initializeConnection();
+      const connection = service.getConnection();
+
+      // Create data channel before setting remote offer for joiner
+      if (callbacks.createDataChannel) {
+        callbacks.createDataChannel(connection);
+      }
+
       await service.setRemoteOffer(offerFromUrl);
       const answer = await service.createAnswer();
 
       const encodedAnswer = SignalingService.encode(answer);
       return encodedAnswer;
     },
-    [initializeConnection]
+    [initializeConnection, callbacks]
   );
 
   const submitAnswer = useCallback(async (code: string) => {
