@@ -55,8 +55,11 @@ function App() {
   }, [handleJoinSession]);
 
   const handleCreateSession = async () => {
+    console.log('handleCreateSession called');
     try {
+      console.log('Calling createSession...');
       await createSession();
+      console.log('createSession completed successfully');
     } catch (error) {
       console.error('Failed to create session:', error);
     }
