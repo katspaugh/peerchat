@@ -171,16 +171,28 @@ function App() {
           <>
             <VideoCall localStream={localStream} remoteStream={remoteStream} />
 
-            <div className="flex justify-center gap-4">
-              {!isVideoCallActive && (
-                <Button onClick={handleStartVideoCall} disabled={isRequestingMedia} size="lg">
-                  {isRequestingMedia ? 'Requesting permissions...' : 'Start Video Call'}
-                </Button>
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex justify-center gap-4">
+                {!isVideoCallActive && (
+                  <Button onClick={handleStartVideoCall} disabled={isRequestingMedia} size="lg">
+                    {isRequestingMedia ? 'Requesting permissions...' : 'Start My Video'}
+                  </Button>
+                )}
+                {isVideoCallActive && (
+                  <Button onClick={handleEndVideoCall} variant="destructive" size="lg">
+                    Stop My Video
+                  </Button>
+                )}
+              </div>
+              {!isVideoCallActive && remoteStream && (
+                <p className="text-sm text-muted-foreground">
+                  The other person has started their video. Click "Start My Video" to join.
+                </p>
               )}
-              {isVideoCallActive && (
-                <Button onClick={handleEndVideoCall} variant="destructive" size="lg">
-                  End Call
-                </Button>
+              {isVideoCallActive && !remoteStream && (
+                <p className="text-sm text-muted-foreground">
+                  Waiting for the other person to start their video...
+                </p>
               )}
             </div>
 

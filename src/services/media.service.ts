@@ -19,7 +19,9 @@ export class MediaService {
     stream: MediaStream,
     connection: RTCPeerConnection
   ): void {
+    console.log('Adding tracks to connection:', stream.getTracks().length);
     stream.getTracks().forEach((track) => {
+      console.log('Adding track:', track.kind);
       connection.addTrack(track, stream);
     });
   }

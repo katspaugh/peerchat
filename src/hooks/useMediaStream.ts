@@ -29,7 +29,9 @@ export function useMediaStream() {
   }, [localStream]);
 
   const handleRemoteTrack = useCallback((event: RTCTrackEvent) => {
+    console.log('Remote track received:', event.track.kind);
     const [stream] = event.streams;
+    console.log('Remote stream:', stream);
     setRemoteStream(stream);
   }, []);
 
