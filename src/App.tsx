@@ -35,24 +35,24 @@ function App() {
       createDataChannel,
     });
 
-  const handleJoinSession = useCallback(async (offer: RTCSessionDescriptionInit) => {
-    try {
-      const code = await joinSession(offer);
-      setMyAnswerCode(code);
-    } catch (error) {
-      console.error('Failed to join session:', error);
-    }
-  }, [joinSession]);
-
   useEffect(() => {
     const offerFromUrl = SignalingService.getSessionFromUrl();
     if (offerFromUrl) {
       // This is initialization logic that only runs once on mount
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsJoiner(true);
-      handleJoinSession(offerFromUrl);
+
+      // Call joinSession directly to avoid dependency loop
+      joinSession(offerFromUrl)
+        .then((code) => {
+          setMyAnswerCode(code);
+        })
+        .catch((error) => {
+          console.error('Failed to join session:', error);
+        });
     }
-  }, [handleJoinSession]);
+    // Empty deps array - only run once on mount since URL doesn't change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateSession = async () => {
     console.log('handleCreateSession called');
