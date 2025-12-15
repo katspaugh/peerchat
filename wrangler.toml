@@ -1,0 +1,7 @@
+name = "peerchat"
+compatibility_date = "2025-12-15"
+assets = { directory = "./dist" }
+
+# Optional: configure custom domain, environment variables, etc.
+# [env.production]
+# routes = [{ pattern = "peerchat.example.com", custom_domain = true }]
