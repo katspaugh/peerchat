@@ -2,7 +2,7 @@ import { Badge } from './ui/badge';
 import type { ConnectionState } from '@/types';
 
 const statusConfig: Record<ConnectionState, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
-  disconnected: { label: 'Disconnected', variant: 'destructive' },
+  disconnected: { label: 'Not Connected', variant: 'secondary' },
   'creating-offer': { label: 'Creating...', variant: 'default' },
   'waiting-for-code': { label: 'Waiting', variant: 'secondary' },
   connecting: { label: 'Connecting', variant: 'secondary' },
