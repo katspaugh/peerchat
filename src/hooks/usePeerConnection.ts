@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { WebRTCService } from '@/services/webrtc.service';
+import { WebRTCService, type ProgressCallback } from '@/services/webrtc.service';
 import { SignalingService } from '@/services/signaling.service';
 import type { ConnectionState } from '@/types';
 
@@ -7,6 +7,8 @@ interface UsePeerConnectionCallbacks {
   onTrack?: (event: RTCTrackEvent) => void;
   onDataChannel?: (event: RTCDataChannelEvent) => void;
   createDataChannel?: (connection: RTCPeerConnection) => void;
+  onNegotiationNeeded?: (description: RTCSessionDescriptionInit) => void;
+  onProgress?: ProgressCallback;
 }
 
 export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
@@ -19,7 +21,7 @@ export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
       webrtcServiceRef.current.close();
     }
 
-    const service = new WebRTCService();
+    const service = new WebRTCService(callbacks.onProgress);
     webrtcServiceRef.current = service;
 
     const connection = service.getConnection();
@@ -42,13 +44,16 @@ export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
     }
 
     return service;
-  }, [callbacks.onTrack, callbacks.onDataChannel]);
+  }, [callbacks.onTrack, callbacks.onDataChannel, callbacks.onProgress]);
 
   const createSession = useCallback(async () => {
     setState('creating-offer');
 
     const service = initializeConnection();
     const connection = service.getConnection();
+
+    // Set this peer as the offerer for perfect negotiation
+    service.setIsOfferer(true);
 
     // Create data channel before creating offer
     if (callbacks.createDataChannel) {
@@ -68,6 +73,9 @@ export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
 
       const service = initializeConnection();
       const connection = service.getConnection();
+
+      // This peer is NOT the offerer (perfect negotiation)
+      service.setIsOfferer(false);
 
       // Create data channel before setting remote offer for joiner
       if (callbacks.createDataChannel) {
@@ -103,6 +111,33 @@ export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
     return webrtcServiceRef.current?.getConnection() ?? null;
   }, []);
 
+  const handleNegotiation = useCallback(
+    async (
+      description: RTCSessionDescriptionInit,
+      sendAnswer: (answer: RTCSessionDescriptionInit) => void
+    ) => {
+      if (!webrtcServiceRef.current) {
+        console.error('No active connection for negotiation');
+        return;
+      }
+
+      await webrtcServiceRef.current.handleNegotiationOffer(description, sendAnswer);
+    },
+    []
+  );
+
+  const enableNegotiation = useCallback(() => {
+    if (!webrtcServiceRef.current) {
+      console.error('No active connection to enable negotiation');
+      return;
+    }
+
+    if (callbacks.onNegotiationNeeded) {
+      console.log('Enabling renegotiation for adding media tracks');
+      webrtcServiceRef.current.setNegotiationCallback(callbacks.onNegotiationNeeded);
+    }
+  }, [callbacks]);
+
   useEffect(() => {
     return () => {
       if (webrtcServiceRef.current) {
@@ -118,5 +153,7 @@ export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
     joinSession,
     submitAnswer,
     getConnection,
+    handleNegotiation,
+    enableNegotiation,
   };
 }

@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Input } from './components/ui/input';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { ChatInterface } from './components/ChatInterface';
 import { VideoCall } from './components/VideoCall';
+import { SessionCreator } from './components/SessionCreator';
+import { SessionProgress } from './components/SessionProgress';
+import { ShareLink } from './components/ShareLink';
+import { JoinerCode } from './components/JoinerCode';
 import { usePeerConnection } from './hooks/usePeerConnection';
 import { useDataChannel } from './hooks/useDataChannel';
 import { useMediaStream } from './hooks/useMediaStream';
@@ -15,6 +17,16 @@ function App() {
   const [myAnswerCode, setMyAnswerCode] = useState('');
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
   const [isJoiner, setIsJoiner] = useState(false);
+  const [progressStep, setProgressStep] = useState('');
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  // Use refs to break circular dependency between hooks
+  const handleNegotiationRef = useRef<
+    (description: RTCSessionDescriptionInit, sendAnswer: (answer: RTCSessionDescriptionInit) => void) => void
+  >();
+  const sendNegotiationRef = useRef<(description: RTCSessionDescriptionInit) => void>();
 
   const {
     localStream,
@@ -26,14 +38,48 @@ function App() {
     stopRemoteStream,
   } = useMediaStream();
 
-  const { messages, createDataChannel, handleDataChannel, sendMessage } = useDataChannel();
-
-  const { state, shareableLink, createSession, joinSession, submitAnswer, getConnection } =
-    usePeerConnection({
-      onTrack: handleRemoteTrack,
-      onDataChannel: handleDataChannel,
-      createDataChannel,
+  const { messages, createDataChannel, handleDataChannel, sendMessage, sendNegotiation } =
+    useDataChannel({
+      onNegotiation: (description: RTCSessionDescriptionInit) => {
+        if (handleNegotiationRef.current && sendNegotiationRef.current) {
+          handleNegotiationRef.current(description, sendNegotiationRef.current);
+        }
+      },
     });
+
+  const {
+    state,
+    shareableLink,
+    createSession,
+    joinSession,
+    submitAnswer,
+    getConnection,
+    handleNegotiation,
+    enableNegotiation,
+  } = usePeerConnection({
+    onTrack: handleRemoteTrack,
+    onDataChannel: handleDataChannel,
+    createDataChannel,
+    onNegotiationNeeded: (description: RTCSessionDescriptionInit) => {
+      console.log('Negotiation needed, sending via data channel');
+      sendNegotiation(description);
+    },
+    onProgress: (step: string, progress: number) => {
+      setProgressStep(step);
+      setProgressPercent(progress);
+    },
+  });
+
+  // Update refs after hooks are initialized
+  handleNegotiationRef.current = handleNegotiation;
+  sendNegotiationRef.current = sendNegotiation;
+
+  // Enable renegotiation only after connection is established
+  useEffect(() => {
+    if (state === 'connected') {
+      enableNegotiation();
+    }
+  }, [state, enableNegotiation]);
 
   useEffect(() => {
     const offerFromUrl = SignalingService.getSessionFromUrl();
@@ -56,12 +102,16 @@ function App() {
 
   const handleCreateSession = async () => {
     console.log('handleCreateSession called');
+    setProgressStep('');
+    setProgressPercent(0);
     try {
       console.log('Calling createSession...');
       await createSession();
       console.log('createSession completed successfully');
     } catch (error) {
       console.error('Failed to create session:', error);
+      setProgressStep('');
+      setProgressPercent(0);
     }
   };
 
@@ -89,14 +139,23 @@ function App() {
   };
 
   const handleEndVideoCall = () => {
-    stopLocalStream();
+    const connection = getConnection();
+    stopLocalStream(connection);
     stopRemoteStream();
     setIsVideoCallActive(false);
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(shareableLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  }, [shareableLink]);
+
+  const handleCopyCode = useCallback(() => {
+    navigator.clipboard.writeText(myAnswerCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  }, [myAnswerCode]);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
@@ -107,64 +166,30 @@ function App() {
         </header>
 
         {state === 'disconnected' && !isJoiner && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Start a Session</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={handleCreateSession} className="w-full">
-                Create Session
-              </Button>
-            </CardContent>
-          </Card>
+          <SessionCreator onCreateSession={handleCreateSession} />
+        )}
+
+        {state === 'creating-offer' && !isJoiner && (
+          <SessionProgress step={progressStep} percent={progressPercent} />
         )}
 
         {state === 'waiting-for-code' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Share this link</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input value={shareableLink} readOnly className="flex-1" />
-                <Button onClick={() => copyToClipboard(shareableLink)}>Copy</Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Send this link to the person you want to connect with. They will send you a code.
-              </p>
-              <div className="border-t pt-4">
-                <label className="text-sm font-medium">Paste the code they send you:</label>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    value={answerCode}
-                    onChange={(e) => setAnswerCode(e.target.value)}
-                    placeholder="Paste code here..."
-                    className="flex-1"
-                  />
-                  <Button onClick={handleSubmitAnswer} disabled={!answerCode.trim()}>
-                    Submit
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ShareLink
+            shareableLink={shareableLink}
+            answerCode={answerCode}
+            copied={copiedLink}
+            onCopy={handleCopyLink}
+            onAnswerCodeChange={setAnswerCode}
+            onSubmitAnswer={handleSubmitAnswer}
+          />
         )}
 
-        {isJoiner && myAnswerCode && state !== 'connected' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Send this code to start the session</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input value={myAnswerCode} readOnly className="flex-1 font-mono text-sm" />
-                <Button onClick={() => copyToClipboard(myAnswerCode)}>Copy</Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Copy this code and send it to the person who shared the link with you.
-              </p>
-            </CardContent>
-          </Card>
+        {isJoiner && state !== 'connected' && (
+          myAnswerCode ? (
+            <JoinerCode code={myAnswerCode} copied={copiedCode} onCopy={handleCopyCode} />
+          ) : (
+            <SessionProgress step={progressStep} percent={progressPercent} />
+          )
         )}
 
         {state === 'connected' && (

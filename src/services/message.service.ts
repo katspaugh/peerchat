@@ -1,8 +1,9 @@
-import type { Message, MessageData } from '@/types';
+import type { Message, MessageData, ChatMessageData } from '@/types';
 
 export class MessageService {
   static serialize(text: string): string {
-    const data: MessageData = {
+    const data: ChatMessageData = {
+      type: 'chat',
       text,
       timestamp: Date.now(),
     };
@@ -21,7 +22,7 @@ export class MessageService {
     };
   }
 
-  static createRemoteMessage(data: MessageData): Message {
+  static createRemoteMessage(data: ChatMessageData): Message {
     return {
       text: data.text,
       timestamp: data.timestamp,

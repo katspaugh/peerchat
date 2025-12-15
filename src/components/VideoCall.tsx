@@ -46,7 +46,7 @@ export function VideoCall({ localStream, remoteStream }: VideoCallProps) {
             autoPlay
             playsInline
             muted
-            className="w-full aspect-video bg-black"
+            className="w-full aspect-video bg-black scale-x-[-1]"
           />
           <div className="p-2 text-center text-sm">You</div>
         </Card>

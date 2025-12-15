@@ -12,10 +12,18 @@ export interface Message {
   from: 'local' | 'remote';
 }
 
-export interface MessageData {
+export interface ChatMessageData {
+  type: 'chat';
   text: string;
   timestamp: number;
 }
+
+export interface NegotiationMessageData {
+  type: 'negotiation';
+  description: RTCSessionDescriptionInit;
+}
+
+export type MessageData = ChatMessageData | NegotiationMessageData;
 
 export interface EncodedSessionData {
   type: 'offer' | 'answer';
