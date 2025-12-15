@@ -28,9 +28,11 @@ export function usePeerConnection(callbacks: UsePeerConnectionCallbacks) {
 
     connection.onconnectionstatechange = () => {
       const connectionState = connection.connectionState;
+      console.log('Connection state changed:', connectionState);
       if (connectionState === 'connected') {
         setState('connected');
       } else if (connectionState === 'failed') {
+        console.error('Connection failed! State:', connectionState);
         setState('failed');
       }
     };

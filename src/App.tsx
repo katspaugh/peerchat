@@ -83,6 +83,7 @@ function App() {
 
   useEffect(() => {
     const offerFromUrl = SignalingService.getSessionFromUrl();
+    console.log('Initial mount - offer from URL:', offerFromUrl ? 'present' : 'none');
     if (offerFromUrl) {
       // This is initialization logic that only runs once on mount
       setIsJoiner(true);
@@ -90,10 +91,12 @@ function App() {
       // Call joinSession directly to avoid dependency loop
       joinSession(offerFromUrl)
         .then((code) => {
+          console.log('Join session successful, code generated');
           setMyAnswerCode(code);
         })
         .catch((error) => {
           console.error('Failed to join session:', error);
+          // Don't leave in a bad state - could reset or show error to user
         });
     }
     // Empty deps array - only run once on mount since URL doesn't change
